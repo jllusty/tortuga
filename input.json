@@ -1,0 +1,14 @@
+{
+    "axiom": "F",
+    "rules": {
+        "F": "F[&F]F[*F]F"
+    },
+    "iter": "1",
+    "inter": {
+        "F": "move",
+        "[": "push",
+        "]": "pop",
+        "&": "rotateY",
+        "*": "rotateX"
+    }
+}

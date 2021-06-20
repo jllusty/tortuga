@@ -2,34 +2,38 @@
 #include <vector>
 #include <unordered_map>
 
+#include <string>
+#include <fstream>
+#include <streambuf>
+#include "rapidjson/document.h"
+
+#include "parse.hpp"
 #include "grammar.hpp"
 #include "vec3.hpp"
 #include "turtle.hpp"
 
 int main(int argc, char * argv[]) {
-    using namespace std;
-
+    // set parsing filename
+    parse::setInputFilename("input.json");
     // L-system spec.
-    //  production rules
-    unordered_map<char,vector<char>> rules;
-    rules['A'] = vector<char>{'A','B'};
-    rules['B'] = vector<char>{'A'};
-    //  axiom
-    vector<char> axiom{'A'};
+    //  get iterations
+    int iter = parse::getIterations();
+    //  get axiom
+    std::vector<char> axiom = parse::getAxiom();
+    //  get rewriting/production rules
+    std::unordered_map<char,std::vector<char>> rules = parse::getRules();
+    // get turtle interpretation of symbols
+    std::unordered_map<char,turtle::TurtleCommand*> inter = parse::getInterpretation();
+
     // get 'num'-th production
-    int num = 2;  // num productions
-    for(int i = 0; i < num; ++i) {
+    for(int i = 0; i < iter; ++i) {
         grammar::apply(axiom,rules);
     }
-    for(char& c : axiom) cout << c;
-    cout << "\n";
+    for(char& c : axiom) std::cout << c;
+    std::cout << "\n";
 
     // turtle interpretation spec.
-    unordered_map<char,turtle::TurtleCommand*> interpretation;
-    interpretation['A'] = &turtle::moveTurtle;
-    interpretation['B'] = &turtle::rotateTurtleX;
-    // get interpretation's path
-    vector<vec3> moves = turtle::interpret(axiom, interpretation);
-    for(vec3& vec : moves) cout << vec << ", ";
-    cout << "\n";
+    std::vector<vec3> moves = turtle::interpret(axiom, inter);
+    for(vec3& vec : moves) std::cout << vec << ", ";
+    std::cout << "\n";
 }

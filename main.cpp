@@ -22,7 +22,7 @@ int main(int argc, char * argv[]) {
     //  get rewriting rules
     grammar::rewrites rules = json::getRules();
 
-    std::cout << "will do " << iter << " applications\n";
+    std::cout << "tortuga will do " << iter << " applications\n";
 
     // get 'num'-th production
     std::cout << "axiom:    " << grammar::wordToString(axiom) << "\n";
@@ -32,7 +32,7 @@ int main(int argc, char * argv[]) {
     }
 
     // turtle interpretation spec.
-    //std::vector<vec3> moves = turtle::interpret(axiom, inter);
-    //for(vec3& vec : moves) std::cout << vec << ", ";
-    //std::cout << "\n";
+    std::vector<std::pair<vec3,vec3>> moves = turtle::interpret(axiom);
+    for(auto& p : moves)
+        std::cout << p.first << " --> " << p.second << "\n";
 }

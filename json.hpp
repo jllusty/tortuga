@@ -118,7 +118,7 @@ namespace json {
         return rules;
     }
     // get turtle interpretation of symbols
-    std::unordered_map<char,turtle::TurtleCommand*> getInterpretation() {
+    /*std::unordered_map<char,turtle::TurtleCommand*> getInterpretation() {
         std::unordered_map<char,turtle::TurtleCommand*> inter;
         const rapidjson::Value::Object& interObject = doc["inter"].GetObject();
         for(rapidjson::Value::ConstMemberIterator itr = interObject.MemberBegin();
@@ -149,7 +149,7 @@ namespace json {
             }
         }
         return inter;
-    }
+    }*/
 }
 
 #define JSON_HPP

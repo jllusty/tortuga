@@ -2,87 +2,88 @@
     "modules": [
         {
             "symbol": "A",
-            "parameters": ["x", "y"]
+            "parameters": []
         },
         {
-            "symbol": "B",
+            "symbol": "F",
             "parameters": ["x"]
         },
         {
-            "symbol": "C",
+            "symbol": "[",
             "parameters": []
+        },
+        {
+            "symbol": "]",
+            "parameters": []
+        },
+        {
+            "symbol": "+",
+            "parameters": ["x"]
+        },
+        {
+            "symbol": "-",
+            "parameters": ["x"]
         }
     ],
     "axiom": [
         {
-            "symbol": "B",
-            "parameters": ["2"]
-        },
-        {
             "symbol": "A",
-            "parameters": ["4", "4"]
+            "parameters": []
         }
     ],
     "rules": [
         {
             "symbol": "A",
-            "conditions": [
-                "y 3 <="
-            ],
+            "conditions": [],
             "word": [
                 {
-                    "symbol": "A",
-                    "parameters": ["2 x *", "x y +"]
-                }
-            ]
-        },
-        {
-            "symbol": "A",
-            "conditions": [
-                "y 3 >"
-            ],
-            "word": [
+                    "symbol": "F",
+                    "parameters": ["1"]
+                },
                 {
-                    "symbol": "B",
-                    "parameters": ["x"]
+                    "symbol": "[",
+                    "parameters": []
+                },
+                {
+                    "symbol": "+",
+                    "parameters": ["1.48353"]
                 },
                 {
                     "symbol": "A",
-                    "parameters": ["x y /", "0"]
-                }
-            ]
-        },
-        {
-            "symbol": "B",
-            "conditions": [
-                "x 1 <"
-            ],
-            "word": [
+                    "parameters": []
+                },
                 {
-                    "symbol": "C",
+                    "symbol": "]",
+                    "parameters": []
+                },
+                {
+                    "symbol": "[",
+                    "parameters": []
+                },
+                {
+                    "symbol": "-",
+                    "parameters": ["1.48353"]
+                },
+                {
+                    "symbol": "A",
+                    "parameters": []
+                },
+                {
+                    "symbol": "]",
                     "parameters": []
                 }
             ]
         },
         {
-            "symbol": "B",
-            "conditions": [
-                "x 1 >="
-            ],
+            "symbol": "F",
+            "conditions": [],
             "word": [
                 {
-                    "symbol": "B",
-                    "parameters": ["x 1 -"]
+                    "symbol": "F",
+                    "parameters": ["1.456 x *"]
                 }
             ]
         }
     ],
-    "iter": "4",
-    "inter": {
-        "F": "move",
-        "[": "push",
-        "]": "pop",
-        "&": "rotateY",
-        "*": "rotateX"
-    }
+    "iter": "3"
 }

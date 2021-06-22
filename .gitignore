@@ -1,3 +1,4 @@
 rapidjson/
 *.exe
 *.gch
+.vscode/

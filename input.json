@@ -1,9 +1,83 @@
 {
-    "axiom": "F",
-    "rules": {
-        "F": "F[&F]F[*F]F"
-    },
-    "iter": "1",
+    "modules": [
+        {
+            "symbol": "A",
+            "parameters": ["x", "y"]
+        },
+        {
+            "symbol": "B",
+            "parameters": ["x"]
+        },
+        {
+            "symbol": "C",
+            "parameters": []
+        }
+    ],
+    "axiom": [
+        {
+            "symbol": "B",
+            "parameters": ["2"]
+        },
+        {
+            "symbol": "A",
+            "parameters": ["4", "4"]
+        }
+    ],
+    "rules": [
+        {
+            "symbol": "A",
+            "conditions": [
+                "y 3 <="
+            ],
+            "word": [
+                {
+                    "symbol": "A",
+                    "parameters": ["2 x *", "x y +"]
+                }
+            ]
+        },
+        {
+            "symbol": "A",
+            "conditions": [
+                "y 3 >"
+            ],
+            "word": [
+                {
+                    "symbol": "B",
+                    "parameters": ["x"]
+                },
+                {
+                    "symbol": "A",
+                    "parameters": ["x y /", "0"]
+                }
+            ]
+        },
+        {
+            "symbol": "B",
+            "conditions": [
+                "x 1 <"
+            ],
+            "word": [
+                {
+                    "symbol": "C",
+                    "parameters": []
+                }
+            ]
+        },
+        {
+            "symbol": "B",
+            "conditions": [
+                "x 1 >="
+            ],
+            "word": [
+                {
+                    "symbol": "B",
+                    "parameters": ["x 1 -"]
+                }
+            ]
+        }
+    ],
+    "iter": "4",
     "inter": {
         "F": "move",
         "[": "push",

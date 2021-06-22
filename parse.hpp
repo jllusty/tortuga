@@ -1,87 +1,144 @@
+// parse.hpp
+// ---------
+// Functions to evaluate postfix conditional & arithmetic expressions
+
 #ifndef PARSE_HPP
 
+#include <cstdlib>
+#include <cctype>
+#include <cmath>
+
+#include <functional>
+#include <sstream>
+#include <iostream>
 #include <string>
 #include <fstream>
 #include <streambuf>
-#include "rapidjson/document.h"
 
 #include <vector>
 #include <unordered_map>
 
-#include "turtle.hpp"
-
+static bool is_number(const std::string& s) {
+    char* end = nullptr;
+    double val = strtod(s.c_str(), &end);
+    return end != s.c_str() && *end == '\0' && val != HUGE_VAL;
+}
 
 namespace parse {
-    rapidjson::Document doc;
-    void setInputFilename(const std::string& infilename) {
-        std::ifstream input(infilename);
-        // read file into std::string
-        std::string json((std::istreambuf_iterator<char>(input)),
-                        std::istreambuf_iterator<char>());
-        // parse JSON into rapidJSON::Document
-        doc.Parse(json.c_str());
-    }
-    // get iter
-    int getIterations() {
-        const char* iterCStr = doc["iter"].GetString();
-        std::string iterString(iterCStr);
-        return std::stoi(iterString);
-    }
-    // get axiom
-    std::vector<char> getAxiom() {
-        const char* axiomCStr = doc["axiom"].GetString();
-        std::string axiomString(axiomCStr);
-        return std::vector<char>(axiomString.begin(), axiomString.end());
-    }
-    // get rewriting/production rules
-    std::unordered_map<char,std::vector<char>> getRules() {
-        std::unordered_map<char,std::vector<char>> rules;
-        const rapidjson::Value::Object& rulesObject = doc["rules"].GetObject();
-        for(rapidjson::Value::ConstMemberIterator itr = rulesObject.MemberBegin();
-            itr != rulesObject.MemberEnd(); ++itr)
-        {
-            const char* keyCStr = itr->name.GetString();
-                std::string keyString(keyCStr);
-                char key = keyString[0];
-            const char* valCStr = itr->value.GetString();
-                std::string valString(valCStr);
-                std::vector<char> val(valString.begin(),valString.end());
-            rules[key] = val;
-        }
-        return rules;
-    }
-    // get turtle interpretation of symbols
-    std::unordered_map<char,turtle::TurtleCommand*> getInterpretation() {
-        std::unordered_map<char,turtle::TurtleCommand*> inter;
-        const rapidjson::Value::Object& interObject = doc["inter"].GetObject();
-        for(rapidjson::Value::ConstMemberIterator itr = interObject.MemberBegin();
-            itr != interObject.MemberEnd(); ++itr)
-        {
-            const char* keyCStr = itr->name.GetString();
-                std::string keyString(keyCStr);
-                char key = keyString[0];
-            const char* valCStr = itr->value.GetString();
-                std::string valString(valCStr);
-            if(valString == "move") {
-                inter[key] = &turtle::moveTurtle;
+    // parse lex'd conditional expression (assumes postfix)
+    bool evaluateConditional(std::string expression, std::vector<char> params, std::vector<double> vals) {
+        auto iss = std::istringstream{expression};
+        std::string str;
+        std::vector<double> tStack;
+        while (iss >> str) {
+            // check for a given parameter
+            if((str.length() == 1)&&isalpha(str[0])) {
+                for(int i = 0; i < params.size(); ++i) {
+                    if(params[i] == str[0]) {
+                        tStack.push_back(vals[i]);
+                        break;
+                    }
+                }
+                // catch something
             }
-            else if(valString == "rotateX") {
-                inter[key] = &turtle::rotateTurtleX;
+            // check for a number
+            else if(is_number(str)) {
+                tStack.push_back(std::stod(str));
             }
-            else if(valString == "rotateY") {
-                inter[key] = &turtle::rotateTurtleY;
+            // operations
+            else if(str == "+") {
+                double x = tStack.back(); tStack.pop_back();
+                double y = tStack.back(); tStack.pop_back();
+                tStack.push_back(x+y);
             }
-            else if(valString == "rotateZ") {
-                inter[key] = &turtle::rotateTurtleZ;
+            else if(str == "-") {
+                double y = tStack.back(); tStack.pop_back();
+                double x = tStack.back(); tStack.pop_back();
+                tStack.push_back(x-y);
             }
-            else if(valString == "pop") {
-                inter[key] = &turtle::popTurtle;
+            else if(str == "/") {
+                double y = tStack.back(); tStack.pop_back();
+                double x = tStack.back(); tStack.pop_back();
+                tStack.push_back(x/y);
             }
-            else if(valString == "push") {
-                inter[key] = &turtle::pushTurtle;
+            else if(str == "*") {
+                double x = tStack.back(); tStack.pop_back();
+                double y = tStack.back(); tStack.pop_back();
+                tStack.push_back(x*y);
+            }
+            // conditionals
+            else if(str == "<=") {
+                double y = tStack.back(); tStack.pop_back();
+                double x = tStack.back(); tStack.pop_back();
+                return (x <= y);
+            }
+            else if(str == ">=") {
+                double y = tStack.back(); tStack.pop_back();
+                double x = tStack.back(); tStack.pop_back();
+                return (x >= y);
+            }
+            else if(str == ">") {
+                double y = tStack.back(); tStack.pop_back();
+                double x = tStack.back(); tStack.pop_back();
+                return (x > y);
+            }
+            else if(str == "<") {
+                double y = tStack.back(); tStack.pop_back();
+                double x = tStack.back(); tStack.pop_back();
+                return (x < y);
             }
         }
-        return inter;
+        // catch something
+        std::cout << "unexpected conditional\n";
+        return false;
+    }
+
+    double evaluateArithmetic(std::string expression, std::vector<char> params,
+        std::vector<double> vals)
+    {
+        //std::cout << "evaluting: \"" << expression << "\"\n";
+        auto iss = std::istringstream{expression};
+        std::string str;
+        std::vector<double> tStack;
+        while (iss >> str) {
+            // check for a given parameter
+            if((str.length() == 1)&&isalpha(str[0])) {
+                for(int i = 0; i < params.size(); ++i) {
+                    if(params[i] == str[0]) {
+                        tStack.push_back(vals[i]);
+                        break;
+                    }
+                }
+                // catch something
+            }
+            // check for a number
+            else if(is_number(str)) {
+                tStack.push_back(std::stod(str));
+            }
+            // operations
+            else if(str == "+") {
+                double x = tStack.back(); tStack.pop_back();
+                double y = tStack.back(); tStack.pop_back();
+                tStack.push_back(x+y);
+            }
+            else if(str == "-") {
+                double y = tStack.back(); tStack.pop_back();
+                double x = tStack.back(); tStack.pop_back();
+                tStack.push_back(x-y);
+            }
+            else if(str == "/") {
+                double y = tStack.back(); tStack.pop_back();
+                double x = tStack.back(); tStack.pop_back();
+                tStack.push_back(x/y);
+            }
+            else if(str == "*") {
+                double x = tStack.back(); tStack.pop_back();
+                double y = tStack.back(); tStack.pop_back();
+                tStack.push_back(x*y);
+            }
+            // catch something
+        }
+        return tStack.back();
     }
 }
 

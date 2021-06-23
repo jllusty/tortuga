@@ -5,3 +5,4 @@ rapidjson/
 include/
 lib/
 makefile
+glad.c

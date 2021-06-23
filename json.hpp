@@ -10,7 +10,7 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
-#include "rapidjson/document.h"
+#include "include/rapidjson/document.h"
 
 #include <vector>
 #include <unordered_map>

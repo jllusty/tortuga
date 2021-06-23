@@ -15,6 +15,10 @@ struct vec3 {
     inline vec3(const vec3& u) {
         data = u.data;
     }
+    // accessors
+    inline float& x() { return data[0]; }
+    inline float& y() { return data[1]; }
+    inline float& z() { return data[2]; }
     // operator overloads
     //  arithmetic
     inline vec3 operator+(const vec3& u) const {
@@ -22,13 +26,32 @@ struct vec3 {
                     data[1]+u.data[1],
                     data[2]+u.data[2]);
     }
+    inline vec3 operator+(const float& s) const {
+        return vec3(data[0]+s,
+                    data[1]+s,
+                    data[2]+s);
+    }
     inline vec3 operator-(const vec3& u) const {
         return vec3(data[0]-u.data[0],
                     data[1]-u.data[1],
                     data[2]-u.data[2]);
     }
+    inline vec3 operator-(const float& s) const {
+        return vec3(data[0]-s,
+                    data[1]-s,
+                    data[2]-s);
+    }
+    inline vec3 operator*(const vec3& u) const {
+        return vec3(data[0]*u.data[0],data[1]*u.data[1],data[2]*u.data[2]);
+    };
     inline vec3 operator*(const float& s) const {
         return vec3(s*data[0],s*data[1],s*data[2]);
+    };
+    inline vec3 operator/(const vec3& u) const {
+        return vec3(data[0]/u.data[0],data[1]/u.data[1],data[2]/u.data[2]);
+    };
+    inline vec3 operator/(const float& s) const {
+        return vec3(data[0]/s,data[1]/s,data[2]/s);
     };
     //  assignment
     inline vec3& operator=(const vec3& u)  {
@@ -60,11 +83,17 @@ struct vec3 {
         return *this;
     }
 };
+inline vec3 operator+(const float&s, const vec3& v) {
+    return vec3(v.data[0] + s,v.data[1] + s,v.data[2] + s);
+}
+inline vec3 operator-(const float&s, const vec3& v) {
+    return vec3(s - v.data[0],s - v.data[1],s - v.data[2]);
+}
 inline vec3 operator*(const float&s, const vec3& v) {
     return vec3(v.data[0] * s,v.data[1] * s,v.data[2] * s);
 }
 inline vec3 operator/(const float&s, const vec3& v) {
-    return vec3(v.data[0] / s,v.data[1] / s,v.data[2] / s);
+    return vec3(s/v.data[0],s/v.data[1],s/v.data[2]);
 }
 // debug only overloads below
 std::ostream& operator<<(std::ostream& os, const vec3& v) {

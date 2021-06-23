@@ -2,3 +2,6 @@ rapidjson/
 *.exe
 *.gch
 .vscode/
+include/
+lib/
+makefile

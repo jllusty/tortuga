@@ -58,6 +58,19 @@ namespace sampler {
             x += dx; y += dy; z += dz;
         }
     }
+    void sampleSphere()
+    {
+        for(int i = 0; i < img.size(); ++i) {
+        for(int j = 0; j < img[0].size(); ++j) {
+        for(int k = 0; k < img[0][0].size(); ++k) {
+            // transform voxel -> world space
+            float x = (float)i/sampler::width*(sampler::wXF-sampler::wX0)+sampler::wX0;
+            float y = (float)j/sampler::height*(sampler::wYF-sampler::wY0)+sampler::wY0;
+            float z = (float)k/sampler::depth*(sampler::wZF-sampler::wZ0)+sampler::wZ0;
+            vec3 p(x,y,z);
+            if(sqrt(dot(p,p)) < sampler::width) img[i][j][k] = 1.0;
+        }}}
+    }
     void sampleLines(std::vector<std::pair<vec3,vec3>> lines)
     {
         for(int i = 0; i < img.size(); ++i) {

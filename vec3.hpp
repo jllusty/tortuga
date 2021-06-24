@@ -1,6 +1,8 @@
 #ifndef VEC3_HPP
 
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <array>
 #include <ostream>
 
@@ -100,7 +102,6 @@ std::ostream& operator<<(std::ostream& os, const vec3& v) {
     os << "(" << v.data[0] << ", " << v.data[1] << ", " << v.data[2] << ")";
     return os;
 }
-
 
 // dot product
 inline float dot(const vec3& v, const vec3& u) {

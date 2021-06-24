@@ -8,14 +8,17 @@
 #include <vector>
 
 namespace glsl {
+    
     // read filename's GLSL, compile into a returned glShader
     GLuint compileShader(GLenum type, const std::string& filename)
     {
         // read file contents into string
         std::ifstream f(filename);
+        //std::cout << "fetching data...\n";
         std::string source((std::istreambuf_iterator<char>(f)),
                                std::istreambuf_iterator<char>());
         const char * data = source.c_str();
+        //std::cout << "got data!\n";
         // create shader 
         GLuint shader = glCreateShader(type);
         // source shader GLSL source
@@ -26,13 +29,14 @@ namespace glsl {
         GLint status;
         glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
         if(status == GL_FALSE) {
+            std::cout << "Error: Shader Compilation of '" << filename << "' failed:\n";
             // something went wrong, ask what happened
             GLint logLength;
             glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
             std::vector<char> infoLogData(logLength);
+            std::cout << "Log length = " << logLength << "\n";
             glGetShaderInfoLog(shader, logLength, nullptr, infoLogData.data());
             std::string infoLog(infoLogData.begin(), infoLogData.end());
-            std::cout << "Error: Shader Compilation of '" << filename << "' failed:\n";
             std::cout << infoLog << "\n";
             return 0;
         }

@@ -23,6 +23,14 @@
         {
             "symbol": "-",
             "parameters": ["x"]
+        },
+        {
+            "symbol": "&",
+            "parameters": ["x"]
+        },
+        {
+            "symbol": "^",
+            "parameters": ["x"]
         }
     ],
     "axiom": [
@@ -85,5 +93,5 @@
             ]
         }
     ],
-    "iter": "7"
+    "iter": "8"
 }

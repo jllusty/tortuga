@@ -23,8 +23,9 @@
 const unsigned int width = 800;
 const unsigned int height = 600;
 
-float cameraHeight = 6.0;
-float cameraDistance = 6.0;
+float cameraHeight = 12.0;
+float cameraDistance = 64.0;
+float cameraTargetHeight = 0.0;
 void processInput(GLFWwindow*);
 
 void getGLError();
@@ -74,25 +75,27 @@ int main(int argc, char * argv[]) {
 
     // turtle interpretation spec.
     std::vector<std::pair<vec3,vec3>> moves = turtle::interpret(axiom);
-    float fD = 0;
-    vec3 fV = vec3(0,0,0);
+    float fD = 0; float shiftX = 0; float shiftY = 0;
     for(auto& p : moves) {
         //std::cout << p.first << " --> " << p.second << "\n";
-        float d1 = sqrt(dot(p.first,p.first));
-        if(d1>fD) { fV = p.first; fD = d1; }
-        float d2 = sqrt(dot(p.second,p.second));
-        if(d2>fD) { fV = p.second; fD = d2; }
+        float dx = abs(p.second.x());
+        float dy = abs(p.second.y());
+        float dz = abs(p.second.z());
+        fD = max(fD,dx);
+        fD = max(fD,dy);
+        fD = max(fD,dz);
     }
-    int d = ceil(fD);
+    float d = ceil(fD);
     std::cout << "scale = " << d << "\n";
 
     // first program - generate voxel data
     // stupid idea
-    const int resolution = 64;
+    const int resolution = 256;
     const int gridWidth = resolution;
     const int gridHeight = resolution;
     const int gridDepth = resolution;
     // FBO
+    std::cout << "initializing off-screen render target ... \n";
     GLuint fbo;
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -109,6 +112,8 @@ int main(int argc, char * argv[]) {
     // check if fbo is complete
     if( glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) 
         std::cout << "Error: Framebuffer is not complete!\n";
+    std::cout << "done!\n";
+    std::cout << "creating voxel-slice sample domain...\n";
     //glBindFramebuffer(GL_FRAMEBUFFER, 0);
     // create sampling grid
     float grid[gridWidth*gridHeight*2];
@@ -119,7 +124,9 @@ int main(int argc, char * argv[]) {
         grid[c+1] = 2.0f*(float)j/(float)gridHeight - 1.0f + 1.0f/(float)gridHeight;
         c+=2;
     }}
+    std::cout << "done!\n";
     // create geometry textures
+    std::cout << "creating turtle path texture...\n";
     GLuint texLines;
     glGenTextures(1, &texLines);
     glBindTexture(GL_TEXTURE_2D, texLines);
@@ -127,29 +134,60 @@ int main(int argc, char * argv[]) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    unsigned int numLines = 2;
-    // 
-    const int tWidth = 64, tHeight = 64;
-    GLubyte lineData[tWidth][tHeight][4];
-    for(int i = 0; i < tWidth; ++i) {
-    for(int j = 0; j < tHeight; ++j) {
-        int c = ((((i&0x8)==0)^((j&0x8))==0))*255;
-        lineData[i][j][0] = (GLubyte) c;
-        lineData[i][j][1] = (GLubyte) c;
-        lineData[i][j][2] = (GLubyte) c;
-    }}
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tWidth, tHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, lineData);
+    //unsigned int numLines = 1;
+    //vec3 r0 = moves[0].first, rf = moves[0].second;
 
+    const int tWidth = 64, tHeight = 64;
+    GLubyte lineData[tWidth][tHeight][3];
+    std::cout << "num lines = " << moves.size() << "\n";
+    if(moves.size() > 64*64/2) {
+        std::cout << "Too many lines, yo. Slow it down.\n";
+        return -1;
+    }
+    for(int k = 0; k < moves.size(); ++k) {
+        int i = k % 64;
+        int j = k / 64;
+        vec3 r0 = moves[k].first, rf = moves[k].second;
+        r0 /= (d); rf /= (d);
+        r0+=vec3(1.0f,1.0f,1.0f);
+        rf+=vec3(1.0f,1.0f,1.0f);
+        r0 *= 32.0f; rf *= 32.0f;
+        GLubyte x0 = (GLubyte)ceil(r0.x());
+        GLubyte y0 = (GLubyte)ceil(r0.y());
+        GLubyte z0 = (GLubyte)ceil(r0.z());
+        GLubyte xf = (GLubyte)ceil(rf.x());
+        GLubyte yf = (GLubyte)ceil(rf.y());
+        GLubyte zf = (GLubyte)ceil(rf.z());
+        lineData[i][2*j][0] = x0;
+        lineData[i][2*j][1] = y0;
+        lineData[i][2*j][2] = z0;
+        lineData[i][2*j+1][0] = xf;//xf;
+        lineData[i][2*j+1][1] = yf;//yf;
+        lineData[i][2*j+1][2] = zf;//zf;
+        //std::cout << "line " << i << " is " << 
+        //    r0/*-vec3(32.,32.,0.)*/ << " --> " << 
+        //    rf/*-vec3(32.,32.,0.)*/ << "\n";
+    }
+    std::cout << "done!\n";
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tWidth, tHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, &lineData);
+
+    std::cout << "compiling sampling shaders...\n";
     GLuint vertexShader = glsl::compileShader(GL_VERTEX_SHADER, "shaders/v_vertex.glsl");
+    getGLError();
     if(vertexShader == 0) return -1;
     GLuint fragmentShader = glsl::compileShader(GL_FRAGMENT_SHADER, "shaders/v_frag.glsl");
+    getGLError();
     if(fragmentShader == 0) return -1;
     GLuint program = glsl::linkShaders(vertexShader, fragmentShader);
+    getGLError();
     if(program == 0) return -1;
+    std::cout << "done!\n";
 
     // uniform location
     GLuint levelLoc = glGetUniformLocation(program, "level");
     GLuint texLoc = glGetUniformLocation(program, "lineData");
+    GLuint numLinesLoc = glGetUniformLocation(program, "numLines");
 
     // load vertices
     GLuint vbo;
@@ -163,6 +201,7 @@ int main(int argc, char * argv[]) {
     glUseProgram(program);
 
     // set texture
+    glUniform1i(numLinesLoc, moves.size());
     glUniform1i(texLoc, 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texLines);
@@ -171,6 +210,7 @@ int main(int argc, char * argv[]) {
     std::cout << "max size = " << sizeof(std::size_t) << "\n";
 
     GLubyte *pixel = new GLubyte[gridWidth*gridHeight*gridDepth*4];
+    std::cout << "starting voxelization...\n";
     glfwSetTime(0.0);
     for(int i = 0; i < gridDepth; ++i) {
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -181,7 +221,7 @@ int main(int argc, char * argv[]) {
         glReadPixels(0,0,gridWidth,gridHeight,GL_RGBA,GL_UNSIGNED_BYTE,&pixel[4*gridWidth*gridHeight*i]);
     }
     double elapsed = glfwGetTime();
-    std::cout << "voxelization elapsed = " << elapsed << "\n";
+    std::cout << "voxelization done! elapsed = " << elapsed << "\n";
     glViewport(0,0,800,600);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     glDeleteProgram(program);
@@ -190,7 +230,6 @@ int main(int argc, char * argv[]) {
     glDeleteBuffers(1,&vbo);
     glDeleteFramebuffers(1,&fbo);
     glDeleteTextures(1,&tex);
-    std::cout << "Voxelization done.\n";
 
     glEnable(GL_DEPTH_TEST);
     // voxel rasterization program
@@ -266,13 +305,13 @@ int main(int argc, char * argv[]) {
 
     // initialize our matrices
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::scale(model, glm::vec3(2.0f/d));
+    //model = glm::scale(model, glm::vec3(2.0f/d));
         glm::vec3 viewPos = glm::vec3(6.0f,0.0f,0.0f);
         glm::vec3 target = glm::vec3(0,0,0);
         glm::vec3 up = glm::vec3(0,0,1);
     glm::mat4 view = glm::lookAt(viewPos, target, up);
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width/(float)height, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)width/(float)height, 0.1f, 1000.0f);
     glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, &projection[0][0]);
 
     // line rasterization (3D)
@@ -289,7 +328,7 @@ int main(int argc, char * argv[]) {
         float vX = cameraDistance*cos(tiden);
         float vY = cameraDistance*sin(tiden);
         float vZ = cameraHeight;
-        view = glm::lookAt(glm::vec3(vX,vY,vZ), target, up);
+        view = glm::lookAt(glm::vec3(vX,vY,vZ), glm::vec3(0.,0.,cameraTargetHeight), up);
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
 
         //// worse possible way - iterate over EVERY voxel, filled or not
@@ -302,9 +341,12 @@ int main(int argc, char * argv[]) {
                 glm::vec4 f = glm::vec4(*p,*(p+1),*(p+2),*(p+3));
                 f = f/255.0f;
                 glUniform4fv(colorLoc, 1, &f[0]);
-                float x = (float)i-(float)gridWidth/2.0f;//sampler::width*(sampler::wXF-sampler::wX0)+sampler::wX0;
-                float y = (float)j-(float)gridHeight/2.0f;///sampler::height*(sampler::wYF-sampler::wY0)+sampler::wY0;
-                float z = (float)k-(float)gridDepth/2.0f;///sampler::depth*(sampler::wZF-sampler::wZ0)+sampler::wZ0;
+                float x = ((float)k-(float)gridWidth/2.0f);//sampler::width*(sampler::wXF-sampler::wX0)+sampler::wX0;
+                //x = x/(float)gridWidth*2.0;
+                float y = ((float)j-(float)gridHeight/2.0f);///((float)gridHeight/2.0);///sampler::height*(sampler::wYF-sampler::wY0)+sampler::wY0;
+                //y = y/(float)gridHeight*2.0;
+                float z = (float)i-(float)gridDepth/2.0f;///(float)gridDepth;//-(float)gridDepth/2.0f;///sampler::depth*(sampler::wZF-sampler::wZ0)+sampler::wZ0;
+                //z = z/(float)gridDepth;
                 glm::mat4 tModel = glm::translate(model, glm::vec3(x,y,z));
                 glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &tModel[0][0]);
                 glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, nullptr);
@@ -314,22 +356,31 @@ int main(int argc, char * argv[]) {
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+    delete[] pixel;
+    std::cout << "pixels deleted\n";
 
     glfwTerminate();
 }
 
+
 void processInput(GLFWwindow* window) {
     if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        cameraHeight += 0.01;
+        cameraHeight += 1;
     }
     else if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        cameraHeight -= 0.01;
+        cameraHeight -= 1;
     }
     if(glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
-        cameraDistance += 0.01;
+        cameraDistance += 1;
     }
     else if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS) {
-        cameraDistance -= 0.01;
+        cameraDistance -= 1;
+    }
+    if(glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
+        cameraTargetHeight += 1;
+    }
+    else if(glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
+        cameraTargetHeight -= 1;
     }
 }
 

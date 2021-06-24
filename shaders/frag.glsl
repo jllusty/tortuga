@@ -1,9 +1,13 @@
 precision mediump float;
 varying vec3 vTex;
+varying vec3 wPos;
 uniform vec4 color;
 void main() 
 {
-    // distance from center
-    float d = distance(vTex,vec3(0.0))/sqrt(3.0);
-    gl_FragColor = (d>0.5) ? color : vec4(0.);
+    // distance from edges
+    float dx = min(abs(1.0-vTex.x),abs(-1.0+vTex.x));
+    float dy = min(abs(1.0-vTex.y),abs(-1.0+vTex.y));
+    float dz = min(abs(1.0-vTex.z),abs(-1.0+vTex.z));
+    float d = min(dx,min(dy,dz));
+    gl_FragColor = (d>0.25) ? vec4(vec3(0.4,0.35,0.55),1.0) : vec4(0.,0.,0.,1.0);
 }

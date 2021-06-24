@@ -88,7 +88,7 @@ int main(int argc, char * argv[]) {
 
     // first program - generate voxel data
     // stupid idea
-    const int resolution = 256;
+    const int resolution = 64;
     const int gridWidth = resolution;
     const int gridHeight = resolution;
     const int gridDepth = resolution;
@@ -110,6 +110,7 @@ int main(int argc, char * argv[]) {
     if( glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) 
         std::cout << "Error: Framebuffer is not complete!\n";
     //glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // create sampling grid
     float grid[gridWidth*gridHeight*2];
     int c = 0;
     for(int i = 0; i < gridWidth; ++i) {
@@ -118,13 +119,37 @@ int main(int argc, char * argv[]) {
         grid[c+1] = 2.0f*(float)j/(float)gridHeight - 1.0f + 1.0f/(float)gridHeight;
         c+=2;
     }}
+    // create geometry textures
+    GLuint texLines;
+    glGenTextures(1, &texLines);
+    glBindTexture(GL_TEXTURE_2D, texLines);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    unsigned int numLines = 2;
+    // 
+    const int tWidth = 64, tHeight = 64;
+    GLubyte lineData[tWidth][tHeight][4];
+    for(int i = 0; i < tWidth; ++i) {
+    for(int j = 0; j < tHeight; ++j) {
+        int c = ((((i&0x8)==0)^((j&0x8))==0))*255;
+        lineData[i][j][0] = (GLubyte) c;
+        lineData[i][j][1] = (GLubyte) c;
+        lineData[i][j][2] = (GLubyte) c;
+    }}
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tWidth, tHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, lineData);
 
     GLuint vertexShader = glsl::compileShader(GL_VERTEX_SHADER, "shaders/v_vertex.glsl");
+    if(vertexShader == 0) return -1;
     GLuint fragmentShader = glsl::compileShader(GL_FRAGMENT_SHADER, "shaders/v_frag.glsl");
+    if(fragmentShader == 0) return -1;
     GLuint program = glsl::linkShaders(vertexShader, fragmentShader);
+    if(program == 0) return -1;
 
     // uniform location
     GLuint levelLoc = glGetUniformLocation(program, "level");
+    GLuint texLoc = glGetUniformLocation(program, "lineData");
 
     // load vertices
     GLuint vbo;
@@ -136,6 +161,14 @@ int main(int argc, char * argv[]) {
     glVertexAttribPointer(vPosLoc, 2, GL_FLOAT, GL_FALSE, 2.0*sizeof(float), (void*)0);
     glEnableVertexAttribArray(vPosLoc);
     glUseProgram(program);
+
+    // set texture
+    glUniform1i(texLoc, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texLines);
+
+    // get max size of array
+    std::cout << "max size = " << sizeof(std::size_t) << "\n";
 
     GLubyte *pixel = new GLubyte[gridWidth*gridHeight*gridDepth*4];
     glfwSetTime(0.0);
@@ -226,6 +259,7 @@ int main(int argc, char * argv[]) {
     glUseProgram(program);
 
     // get uniform locations
+    GLuint colorLoc = glGetUniformLocation(program, "color");
     GLuint modelLoc = glGetUniformLocation(program, "model");
     GLuint viewLoc = glGetUniformLocation(program, "view");
     GLuint projectionLoc = glGetUniformLocation(program, "projection");
@@ -263,7 +297,11 @@ int main(int argc, char * argv[]) {
         for(int i = 0; i < gridDepth; ++i) {
         for(int j = 0; j < gridHeight; ++j) {
         for(int k = 0; k < gridWidth; ++k) {
-            if(pixel[i*gridWidth*gridHeight*4+gridHeight*j*4+k*4] > 0.0) {
+            GLubyte* p = &pixel[i*gridWidth*gridHeight*4+gridHeight*j*4+k*4];
+            if(*(p+3) > 0.0) {
+                glm::vec4 f = glm::vec4(*p,*(p+1),*(p+2),*(p+3));
+                f = f/255.0f;
+                glUniform4fv(colorLoc, 1, &f[0]);
                 float x = (float)i-(float)gridWidth/2.0f;//sampler::width*(sampler::wXF-sampler::wX0)+sampler::wX0;
                 float y = (float)j-(float)gridHeight/2.0f;///sampler::height*(sampler::wYF-sampler::wY0)+sampler::wY0;
                 float z = (float)k-(float)gridDepth/2.0f;///sampler::depth*(sampler::wZF-sampler::wZ0)+sampler::wZ0;

@@ -64,8 +64,16 @@ namespace glsl {
             std::string infoLog(infoLogData.begin(), infoLogData.end());
             std::cout << "Error: Shader Linking Failed:\n";
             std::cout << infoLog << "\n";
+            // maybe still detach & delete shaders before stopping?
             return 0;
         }
-        else return program;
+        // else
+        // detach shaders
+        glDetachShader(program, vertexShader);
+        glDetachShader(program, fragmentShader);
+        // then delete
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+        return program;
     }
 }

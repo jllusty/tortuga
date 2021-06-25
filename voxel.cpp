@@ -20,8 +20,9 @@
 // opengl utility
 #include "shader.hpp"
 
-const unsigned int width = 800;
-const unsigned int height = 600;
+unsigned int width = 800;
+unsigned int height = 600;
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 float cameraHeight = 12.0;
 float cameraDistance = 64.0;
@@ -44,6 +45,7 @@ int main(int argc, char * argv[]) {
         return -1;
     }
     glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     if(!gladLoadGLES2Loader((GLADloadproc)glfwGetProcAddress)) {
         std::cout << "(GLAD) Failed to initialize.\n";
@@ -90,7 +92,8 @@ int main(int argc, char * argv[]) {
 
     // first program - generate voxel data
     // stupid idea
-    const int resolution = 256;
+    const int resolution = 64;
+    const int gridRoot = ceil(sqrt((float)resolution));
     const int gridWidth = resolution;
     const int gridHeight = resolution;
     const int gridDepth = resolution;
@@ -161,18 +164,27 @@ int main(int argc, char * argv[]) {
         lineData[i][2*j][0] = x0;
         lineData[i][2*j][1] = y0;
         lineData[i][2*j][2] = z0;
-        lineData[i][2*j+1][0] = xf;//xf;
-        lineData[i][2*j+1][1] = yf;//yf;
-        lineData[i][2*j+1][2] = zf;//zf;
-        //std::cout << "line " << i << " is " << 
-        //    r0/*-vec3(32.,32.,0.)*/ << " --> " << 
-        //    rf/*-vec3(32.,32.,0.)*/ << "\n";
+        lineData[i][2*j+1][0] = xf;
+        lineData[i][2*j+1][1] = yf;
+        lineData[i][2*j+1][2] = zf;
     }
     std::cout << "done!\n";
-
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tWidth, tHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, &lineData);
 
-    std::cout << "compiling sampling shaders...\n";
+    // master voxelization texture for raymarching
+    GLuint voxelTex;
+    glGenTextures(1, &voxelTex);
+    glBindTexture(GL_TEXTURE_2D, voxelTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // declare this memory on the GPU, don't fill it from here you sicko
+    const int voxelTextureWidth = gridWidth*gridRoot; 
+    const int voxelTextureHeight = gridHeight * gridRoot;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 
+        voxelTextureWidth, voxelTextureHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+
     GLuint vertexShader = glsl::compileShader(GL_VERTEX_SHADER, "shaders/v_vertex.glsl");
     getGLError();
     if(vertexShader == 0) return -1;
@@ -182,7 +194,6 @@ int main(int argc, char * argv[]) {
     GLuint program = glsl::linkShaders(vertexShader, fragmentShader);
     getGLError();
     if(program == 0) return -1;
-    std::cout << "done!\n";
 
     // uniform location
     GLuint levelLoc = glGetUniformLocation(program, "level");
@@ -206,10 +217,7 @@ int main(int argc, char * argv[]) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texLines);
 
-    // get max size of array
-    std::cout << "max size = " << sizeof(std::size_t) << "\n";
-
-    GLubyte *pixel = new GLubyte[gridWidth*gridHeight*gridDepth*4];
+    // voxelization / 3D sampling
     std::cout << "starting voxelization...\n";
     glfwSetTime(0.0);
     for(int i = 0; i < gridDepth; ++i) {
@@ -217,11 +225,21 @@ int main(int argc, char * argv[]) {
         glClear(GL_COLOR_BUFFER_BIT);
         float level = 2.0f*(float)i/(float)gridDepth - 1.0f + 1.0f/(float)gridDepth;
         glUniform1f(levelLoc, level);
+        // rasterize using our texLines as the bound texture
+        glBindTexture(GL_TEXTURE_2D, texLines);
         glDrawArrays(GL_POINTS, 0, gridWidth*gridDepth);
-        glReadPixels(0,0,gridWidth,gridHeight,GL_RGBA,GL_UNSIGNED_BYTE,&pixel[4*gridWidth*gridHeight*i]);
+        // bind our voxel master structure and copy the data
+        glBindTexture(GL_TEXTURE_2D, voxelTex);
+        int xOffset = resolution*(i % gridRoot); 
+        int yOffset = resolution*(i / gridRoot);
+        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 
+            xOffset, yOffset, 0, 0, gridWidth, gridHeight);
+        //glReadPixels(0,0,gridWidth,gridHeight,GL_RGBA,GL_UNSIGNED_BYTE,&pixel[4*gridWidth*gridHeight*i]);
+        //glfwSwapBuffers(window);
     }
     double elapsed = glfwGetTime();
     std::cout << "voxelization done! elapsed = " << elapsed << "\n";
+    // cleanup
     glViewport(0,0,800,600);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     glDeleteProgram(program);
@@ -230,14 +248,16 @@ int main(int argc, char * argv[]) {
     glDeleteBuffers(1,&vbo);
     glDeleteFramebuffers(1,&fbo);
     glDeleteTextures(1,&tex);
+    std::cout << "cleanup done!\n";
 
     glEnable(GL_DEPTH_TEST);
     // voxel rasterization program
-    vertexShader = glsl::compileShader(GL_VERTEX_SHADER, "shaders/vertex.glsl");
-    fragmentShader = glsl::compileShader(GL_FRAGMENT_SHADER, "shaders/frag.glsl");
+    vertexShader = glsl::compileShader(GL_VERTEX_SHADER, "shaders/rt_vertex.glsl");
+    fragmentShader = glsl::compileShader(GL_FRAGMENT_SHADER, "shaders/rt_frag.glsl");
     program = glsl::linkShaders(vertexShader, fragmentShader);
 
     // setup vertex data (simple cube)
+    /*
     float cube_vertices[] = {
         // front
         -0.5, -0.5,  0.5,
@@ -250,6 +270,7 @@ int main(int argc, char * argv[]) {
          0.5,  0.5, -0.5,
         -0.5,  0.5, -0.5
     };
+    */
     float vertices[] = {
         // T BL
         -1.0f, -1.0f, 0.0f,
@@ -260,6 +281,7 @@ int main(int argc, char * argv[]) {
         -1.0f, 1.0f, 0.0f,
         1.0f, -1.0f, 0.0f
     };
+    /*
     unsigned short cube_elements[] = {
 		// front
 		0, 1, 2,
@@ -280,30 +302,49 @@ int main(int argc, char * argv[]) {
 		3, 2, 6,
 		6, 7, 3
 	};
+    */
     // vertex buffer 
     //GLuint vbo;
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     // index buffer
+    /*
     GLuint ibo;
     glGenBuffers(1, &ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_elements), cube_elements, GL_STATIC_DRAW);
+    */
     // attribute location
     GLuint vPositionLoc = glGetAttribLocation(program, "vPosition");
     glVertexAttribPointer(vPositionLoc, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
     glEnableVertexAttribArray(vPositionLoc);
     glUseProgram(program);
 
+    // get location of voxel sampler2D + resolution uniforms
+    GLuint voxelTexLoc = glGetUniformLocation(program, "voxels");
+    GLuint voxelResLoc = glGetUniformLocation(program, "voxelRes");
+    GLuint resLoc = glGetUniformLocation(program, "resolution");
+    // set resolution + bind voxel texture to sampler
+    glUniform1i(voxelResLoc, resolution);
+    glUniform1i(voxelTexLoc, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, voxelTex);
+
+    // other uniforms
+    GLuint tidenLoc = glGetUniformLocation(program, "tiden");
+
     // get uniform locations
+    /*
     GLuint colorLoc = glGetUniformLocation(program, "color");
     GLuint modelLoc = glGetUniformLocation(program, "model");
     GLuint viewLoc = glGetUniformLocation(program, "view");
     GLuint projectionLoc = glGetUniformLocation(program, "projection");
+    */
 
     // initialize our matrices
+    /*
     glm::mat4 model = glm::mat4(1.0f);
     //model = glm::scale(model, glm::vec3(2.0f/d));
         glm::vec3 viewPos = glm::vec3(6.0f,0.0f,0.0f);
@@ -313,26 +354,36 @@ int main(int argc, char * argv[]) {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
     glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)width/(float)height, 0.1f, 1000.0f);
     glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, &projection[0][0]);
+*/
 
     // line rasterization (3D)
     // Main Loop
+    std::cout << "initialization done! rendering scene ...\n";
     glfwSetTime(0.0);
     while(!glfwWindowShouldClose(window)) {
+        float tiden = glfwGetTime();
+        glUniform1f(tidenLoc, tiden);
+        float screenRes[2] {(float)width,(float)height};
+        glUniform2fv(resLoc, 1, screenRes);
+        
         processInput(window);
         // clear drawing buffers
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // rotate camera
+        /*
         double tiden = glfwGetTime();
         float vX = cameraDistance*cos(tiden);
         float vY = cameraDistance*sin(tiden);
         float vZ = cameraHeight;
         view = glm::lookAt(glm::vec3(vX,vY,vZ), glm::vec3(0.,0.,cameraTargetHeight), up);
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
+        */
 
         //// worse possible way - iterate over EVERY voxel, filled or not
         // worst possible way to draw
+        /*
         for(int i = 0; i < gridDepth; ++i) {
         for(int j = 0; j < gridHeight; ++j) {
         for(int k = 0; k < gridWidth; ++k) {
@@ -351,13 +402,16 @@ int main(int argc, char * argv[]) {
                 glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &tModel[0][0]);
                 glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, nullptr);
             }
-        }}}
+        }}}*/
+        // draw quad for raymarching
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-    delete[] pixel;
-    std::cout << "pixels deleted\n";
+    // cleanup
+    glDeleteTextures(1, &voxelTex);
+    glDeleteProgram(program);
+    glDeleteBuffers(1, &vbo);
 
     glfwTerminate();
 }
@@ -391,4 +445,12 @@ void getGLError() {
     if(err == GL_INVALID_OPERATION) std::cout << "INVALID_OPERATION\n";
     if(err == GL_INVALID_FRAMEBUFFER_OPERATION) std::cout << "INVALID FRAMEBUFFER_OPERATION\n";
     if(err == GL_OUT_OF_MEMORY) std::cout << "OUT OF MEMORY\n";
+}
+
+void framebuffer_size_callback(GLFWwindow* window, int newWidth, int newHeight)
+{
+    // make sure the viewport matches the new window dimensions; note that width and 
+    // height will be significantly larger than specified on retina displays.
+    glViewport(0, 0, newWidth, newHeight);
+    width = newWidth; height = newHeight;
 }

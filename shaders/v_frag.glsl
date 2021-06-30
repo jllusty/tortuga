@@ -1,4 +1,4 @@
-precision mediump float;
+precision highp float;
 varying vec2 vTex;
 uniform sampler2D lineData;
 uniform float level;
@@ -26,7 +26,7 @@ vec4 sampleLines(vec3 uv) {
         if((tH<0.)||(tH>1.)) continue; // return vec4(0.);
         vec3 pL = r0 + tH*(rf-r0);
         float d = sqrt(dot(pL-uv,pL-uv));
-        if(d <= 1.0) return vec4(1.);
+        if(d <= 1.0) return vec4(1.0);
     }
     return vec4(0.);
 }

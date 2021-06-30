@@ -86,7 +86,7 @@ int main(int argc, char * argv[]) {
     std::cout << "scale = " << d << "\n";
 
     // line rasterization (3D)
-    const int resolution = 256;
+    const int resolution = 64;
     int voxelResX = resolution;
     int voxelResY = resolution;
     int voxelResZ = resolution;

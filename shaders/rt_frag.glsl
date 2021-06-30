@@ -1,4 +1,4 @@
-precision mediump float;
+precision highp float;
 
 // time
 uniform float tiden;
@@ -29,43 +29,15 @@ struct Intersection{
 	float w;
 };
 
-struct Sphere{
-	vec3  position;
-	float radius;
-};
-
 struct Plane{
 	vec3 position;
 	vec3 normal;
 };
 
 // global =========================================================================================
-Sphere sphere;
 Plane plane;
 
 // function =======================================================================================
-void intersectSphere(vec3 ray, Sphere s, inout Intersection i){
-	vec3  a = cPos - s.position;
-	float b = dot(a, ray);
-	float c = dot(a, a) - (s.radius * s.radius);
-	float d = b * b - c;
-	if(d > 0.0){
-		float t = -b - sqrt(d);
-		if(t > 0.0 && t < i.t){
-			i.t = t;
-			i.hit = 1.0;
-			i.hitPoint = vec3(
-				cPos.x + ray.x * t,
-				cPos.y + ray.y * t,
-				cPos.z + ray.z * t
-			);
-			i.normal = normalize(i.hitPoint - s.position);
-			float diff = clamp(dot(i.normal, lightDirection), 0.1, 1.0);
-			i.color = vec3(diff);
-		}
-	}
-}
-
 void intersectPlane(vec3 ray, Plane p, inout Intersection i){
 	float d = -dot(p.position, p.normal);
 	float v = dot(ray, p.normal);
@@ -157,48 +129,70 @@ void intersect(vec3 ray, inout Intersection i){
 }
 
 void sampleVoxels(vec3 ray, inout Intersection i) {
-	// get i,j,k of hitPoint, assume we hit the "front", i.e. i = 64
 	float res = float(voxelRes);
 	float root = ceil(sqrt(res));
-	//ivec3 ijk = ivec3(res,int(64.*(i.u-1.0)),int(64.*(i.v-1.0)));
-	//i.u = res*(i.u/2.0+0.5);
-	//i.v = res*(i.v/2.0+0.5);
 
-	// initial coords
-	float iu = res*(i.u/2.0+0.5);
-		iu = min(max(iu,0.),res-1.);
-	float iv = res*(i.v/2.0+0.5);
-		iv = min(max(iv,0.),res-1.);
-	float iw = res*(i.w/2.0+0.5);
-		iw = min(max(iw,0.),res-1.);
+	// initial coords, transform to [0,63)^3
+	vec3 origin = res*(vec3(i.u,i.v,i.w)+1.)/2.;
+	// voxel coords
+	ivec3 map = ivec3(origin);
+	// values of t s.t. tDelta[i]*ray[i] == 1
+	vec3 tDelta = abs(1.0/ray);
+	// direction of step
+	ivec3 stepAmount = ivec3(0);
+	// values of t that hit the next voxel
+	vec3 tMax = vec3(0.);
+	for(int j = 0; j < 3; ++j) {
+		if(ray[j] < 0.0) {
+			stepAmount[j] = -1;
+			tMax[j] = fract(origin[j])*tDelta[j];
+		}
+		else {
+			stepAmount[j] = 1;
+			tMax[j] = (1.0-fract(origin[j]))*tDelta[j];
+		}
+	}
+	//int maxSteps = 1000;
+	// voxel traversal (DDA)
+	while(true) {
+		if(tMax.x < tMax.y) {
+			if(tMax.x < tMax.z) {
+				map.x += stepAmount.x;
+				tMax.x += tDelta.x;
+			}
+			else {
+				map.z += stepAmount.z;
+				tMax.z += tDelta.z;
+			}
+		}
+		else {
+			if(tMax.y < tMax.z) {
+				map.y += stepAmount.y;
+				tMax.y += tDelta.y;
+			}
+			else {
+				map.z += stepAmount.z;
+				tMax.z += tDelta.z;
+			}
+		}
+		// 3D sampler coords
+		// if we are outside the boundaries, stop
+		if((map.x<0)||(map.x>=voxelRes)) break;
+		if((map.y<0)||(map.y>=voxelRes)) break;
+		if((map.z<0)||(map.z>=voxelRes)) break;
+		// convert to coords in 2D texture
+		int uw = voxelRes*int(floor(mod(float(map.z),root)));
+		int vw = voxelRes*(map.z/int(root));
+		float ii = float(map.x+uw)/res/root;
+		float jj = float(map.y+vw)/res/root;
 
-	// DDA until we can't no mo
-	float dx = ray.x, dy = ray.y, dz = ray.z;
-	float step = max(abs(dx),max(abs(dy),abs(dz)));
-	dx /= step; dy /= step; dz /= step;
-	int maxSteps = int(res*sqrt(3.));
-	for(int c = 0; c < maxSteps; ++c) {
-		//ivec3 ijk = ivec3(res,int(64.*(i.u-1.0)),int(64.*(i.v-1.0)));
-
-		// sampler
-		float u = iu + float(c)*dx;
-		float v = iv + float(c)*dy;
-		float w = iw + float(c)*dz;
-		if((u<0.)||(u>res-1.)) break;
-		if((v<0.)||(v>res-1.)) break;
-		if((w<0.)||(w>res-1.)) break;
-		float uw = res*floor(mod(w,root));
-		float vw = res*floor(w/root);
-		// sampler in 2D
-		float ii = (u + uw + 0.5)/res/root;
-		float jj = (v + vw + 0.5)/res/root;
-
-		// did we hit anything?
 		vec4 s = texture2D(voxels,vec2(ii,jj));	
+		// did we hit anything?
 		if(s.x > 0.0) {
-			i.color.r = 1.0;
-			i.color.b = 1.0;
-			i.color.g = 1.0;
+			// move back to edge of voxel
+			i.color.r = ii;
+			i.color.b = jj;
+			i.color.g = 0.;
 			break;
 		}
 	}
@@ -207,9 +201,10 @@ void sampleVoxels(vec3 ray, inout Intersection i) {
 // main ===========================================================================================
 void main(void){
 	// wiggle about
-	cPos.y -= 1.0*sin(tiden);
-	cPos = 1.0*vec3(cos(tiden), sin(tiden), 1.*sin(tiden));
-	cDir = -normalize(cPos);
+	cPos = 0.75*vec3(cos(tiden/4.),sin(tiden/4.),cos(tiden/8.));
+	//cPos = 0.75*vec3(1.);
+	vec3 target = vec3(0.,0.,0.5);
+	cDir = normalize(target-cPos);
 
 	// fragment position
 	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
@@ -221,13 +216,9 @@ void main(void){
 	float f = 2./2./tan(fov/2.);
 	vec3 ray = normalize(cSide * p.x + cUp * p.y + cDir * f);
 	
-	// sphere init
-	sphere.position = vec3(1.0*sin(tiden));
-	sphere.radius = 1.0;
-	
 	// plane init
-	plane.position = vec3(0.0, -1.0, 0.0);
-	plane.normal = vec3(0.0, 0.0, 1.0);
+	//plane.position = vec3(0.0, -1.0, 0.0);
+	//plane.normal = vec3(0.0, 0.0, 1.0);
 	
 	// intersect init
 	Intersection i;

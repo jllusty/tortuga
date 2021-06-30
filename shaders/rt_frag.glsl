@@ -15,7 +15,7 @@ vec3  cPos = vec3(3.0,  0.0,  0.0);
 vec3  cDir = vec3(-1.0,  0.0, 0.0);
 const vec3  cUp  = vec3(0.0,  0.0,  1.0);
 const float targetDepth = 1.0;
-const vec3  lightDirection = vec3(0.577, 0.577, -0.577);
+vec3  lightDirection = vec3(-0.577, 0.577, -0.577);
 
 // struct =========================================================================================
 struct Intersection{
@@ -142,6 +142,8 @@ void sampleVoxels(vec3 ray, inout Intersection i) {
 	ivec3 stepAmount = ivec3(0);
 	// values of t that hit the next voxel
 	vec3 tMax = vec3(0.);
+	// side of voxel we hit
+	int side = 0;
 	for(int j = 0; j < 3; ++j) {
 		if(ray[j] < 0.0) {
 			stepAmount[j] = -1;
@@ -159,20 +161,24 @@ void sampleVoxels(vec3 ray, inout Intersection i) {
 			if(tMax.x < tMax.z) {
 				map.x += stepAmount.x;
 				tMax.x += tDelta.x;
+				side = 0;
 			}
 			else {
 				map.z += stepAmount.z;
 				tMax.z += tDelta.z;
+				side = 1;
 			}
 		}
 		else {
 			if(tMax.y < tMax.z) {
 				map.y += stepAmount.y;
 				tMax.y += tDelta.y;
+				side = 2;
 			}
 			else {
 				map.z += stepAmount.z;
 				tMax.z += tDelta.z;
+				side = 1;
 			}
 		}
 		// 3D sampler coords
@@ -183,39 +189,42 @@ void sampleVoxels(vec3 ray, inout Intersection i) {
 		// convert to coords in 2D texture
 		int uw = voxelRes*int(floor(mod(float(map.z),root)));
 		int vw = voxelRes*(map.z/int(root));
-		float ii = float(map.x+uw)/res/root;
-		float jj = float(map.y+vw)/res/root;
+		float ii = (float(map.x+uw)+0.5)/res/root;
+		float jj = (float(map.y+vw)+0.5)/res/root;
 
 		vec4 s = texture2D(voxels,vec2(ii,jj));	
 		// did we hit anything?
 		if(s.x > 0.0) {
+			float dist = 0.;
+			vec3 dest = vec3(0.);
+			if(side == 0) {
+				dist = (float(map.x) - origin.x + float((1 - stepAmount.x)/2))/ray.x;
+			}
+			else if (side == 1) {
+				dist = (float(map.z) - origin.z + float((1 - stepAmount.z)/2))/ray.z;
+			}
+			else {
+				dist = (float(map.y) - origin.y + float((1 - stepAmount.y)/2))/ray.y;
+			}
+			dest = origin + dist * ray;
+			dest = 2.*(dest-res/2.)/res;
+			float dx = fract(dest.x);
+			float dy = fract(dest.y);
+			float dz = fract(dest.z);
+
+			float ambient = 0.2;
+			float diffuse = max(0., dot(lightDirection,dest));
+
+			vec3 color = vec3(dx,dy,dz);
+
 			// move back to edge of voxel
-			i.color.r = ii;
-			i.color.b = jj;
-			i.color.g = 0.;
+			i.color.rgb = (diffuse+ambient)*color;
 			break;
 		}
 	}
 }
 
-// main ===========================================================================================
-void main(void){
-	// wiggle about
-	cPos = 0.75*vec3(cos(tiden/4.),sin(tiden/4.),cos(tiden/8.));
-	//cPos = 0.75*vec3(1.);
-	vec3 target = vec3(0.,0.,0.5);
-	cDir = normalize(target-cPos);
-
-	// fragment position
-	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	
-	// ray init
-	vec3 cSide = cross(cDir, cUp);
-	const float pi = 4.0 * atan(1.0);
-	const float fov = 60.0/180.*pi;
-	float f = 2./2./tan(fov/2.);
-	vec3 ray = normalize(cSide * p.x + cUp * p.y + cDir * f);
-	
+vec3 castRay(vec3 ray) {
 	// plane init
 	//plane.position = vec3(0.0, -1.0, 0.0);
 	//plane.normal = vec3(0.0, 0.0, 1.0);
@@ -226,7 +235,7 @@ void main(void){
 	i.hit = 0.0;
 	i.hitPoint = vec3(0.0);
 	i.normal = vec3(0.0);
-	i.color = vec3(0.0);
+	i.color = vec3(.2,.3,.3);
 
 	vec3 color = vec3(0.);
 	// check voxels
@@ -242,6 +251,32 @@ void main(void){
 		//color = (i.hit>0.0) ? i.color : vec3(0.,0.,0.);
 		color = vec3(.2,.3,.3);
 	}
+
+	return color;
+}
+
+// main ===========================================================================================
+void main(void){
+	// wiggle about
+	cPos = 2.0*vec3(cos(tiden/4.),sin(tiden/4.),(1.+cos(tiden/8.))/2.);
+	//cPos = 0.75*vec3(1.);
+	vec3 target = vec3(0.,0.,0.35);
+	cDir = normalize(target-cPos);
+
+	//lightDirection = normalize(vec3(cos(tiden),sin(tiden),1.));
+	lightDirection = -cDir;
+
+	// ray init
+	vec3 cSide = cross(cDir, cUp);
+	const float pi = 4.0 * atan(1.0);
+	const float fov = 60.0/180.*pi;
+	float f = 2./2./tan(fov/2.);
+	// frag pos
+	vec2 p = ((gl_FragCoord.xy) * 2.0 - resolution) / min(resolution.x, resolution.y);
+	vec3 ray = normalize(cSide * p.x + cUp * p.y + cDir * f);
+
+	// ray casting
+	vec3 color = castRay(ray);
 
 	// done
 	gl_FragColor = vec4(color,1.0);

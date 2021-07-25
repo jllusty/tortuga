@@ -1,7 +1,7 @@
-attribute vec2 vPos;
+attribute vec3 vPos;
 varying vec2 vTex;
 void main()
 {
-    vTex = vPos;
-    gl_Position = vec4(vPos,0.0,1.0);
+    vTex = vec2(vPos);
+    gl_Position = vec4(vPos,1.0);
 }

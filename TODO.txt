@@ -1,0 +1,7 @@
+Stencil testing for highlighed tree.
+-> Generally, just make it look better imo
+
+Parser for input.
+
+Module support '!(w)' for setting line width. Store as turtle state.
+

@@ -12,6 +12,12 @@
 #include "grammar.hpp"
 
 namespace turtle {
+    struct Line {
+        vec3 initial;
+        vec3 terminal;
+        float width;
+    };
+
     class Turtle {
         // pushdown position and heading, for branching
         struct TurtleState {
@@ -23,18 +29,20 @@ namespace turtle {
         // turtle states
         std::vector<TurtleState> states;
         // moves
-        std::vector<std::pair<vec3,vec3>> moves;
+        std::vector<Line> moves;
     public:
         Turtle(vec3 pos, vec3 head)
             : state{pos,head}
             {}
-        const std::vector<std::pair<vec3,vec3>>& getMoves() const {
+        const std::vector<Line>& getMoves() const {
             return moves;
         }
         inline void move(float dist) {
             vec3 org = state.pos;
             state.pos += dist*state.head;
-            moves.push_back(std::make_pair(org,state.pos));
+            float width = 1.0f/(float)(states.size()+2);
+            Line path{org,state.pos,width};
+            moves.push_back(path);
         }
         inline void rotX(float theta) {
             rotate(state.head, vec3(1,0,0), theta);
@@ -57,7 +65,7 @@ namespace turtle {
     const float pi = 4.0f * atanf(1.0f);
 
     // perform static interpretation
-    std::vector<std::pair<vec3,vec3>> interpret(grammar::word axiom) 
+    std::vector<Line> interpret(grammar::word axiom) 
     {
         Turtle t(vec3(0,0,0),vec3(0,0,1));
         for(grammar::evaluation& e : axiom) {

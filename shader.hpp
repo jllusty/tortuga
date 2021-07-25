@@ -1,3 +1,5 @@
+#ifndef SHADER_HPP
+
 #include "include/glad/glad.h"
 #include "include/GLFW/glfw3.h"
 
@@ -38,7 +40,7 @@ namespace glsl {
             glGetShaderInfoLog(shader, logLength, nullptr, infoLogData.data());
             std::string infoLog(infoLogData.begin(), infoLogData.end());
             std::cout << infoLog << "\n";
-            return 0;
+            return -1;
         }
         else return shader;
     }
@@ -71,9 +73,12 @@ namespace glsl {
         // detach shaders
         glDetachShader(program, vertexShader);
         glDetachShader(program, fragmentShader);
-        // then delete
+        // then flag for deletion
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
         return program;
     }
 }
+
+#define SHADER_HPP
+#endif

@@ -3,6 +3,12 @@ precision highp float;
 // time
 uniform float tiden;
 
+// CPU-side camera state
+uniform vec3 cameraPosition;
+uniform vec3 cameraForward;
+uniform vec3 cameraUp;
+uniform vec3 cameraRight;
+
 // 2D representation of voxels
 uniform sampler2D voxels;
 uniform int voxelRes;		// resolution = dimension of height, width, depth
@@ -13,7 +19,8 @@ uniform vec2 resolution;
 // const ==========================================================================================
 vec3  cPos = vec3(3.0,  0.0,  0.0);
 vec3  cDir = vec3(-1.0,  0.0, 0.0);
-const vec3  cUp  = vec3(0.0,  0.0,  1.0);
+vec3  cUp  = vec3(0.0,  0.0,  1.0);
+vec3 cSide = vec3(0., -1.0, 0.);
 const float targetDepth = 1.0;
 vec3  lightDirection = vec3(-0.577, 0.577, -0.577);
 
@@ -215,10 +222,12 @@ void sampleVoxels(vec3 ray, inout Intersection i) {
 			float ambient = 0.2;
 			float diffuse = max(0., dot(lightDirection,dest));
 
-			vec3 color = vec3(dx,dy,dz);
+			//vec3 color = vec3(dx,dy,dz);
+			vec3 color = vec3(0.1,0.6,0.1);
 
 			// move back to edge of voxel
 			i.color.rgb = (diffuse+ambient)*color;
+			i.color.rgb = color;
 			break;
 		}
 	}
@@ -258,16 +267,26 @@ vec3 castRay(vec3 ray) {
 // main ===========================================================================================
 void main(void){
 	// wiggle about
-	cPos = 2.0*vec3(cos(tiden/4.),sin(tiden/4.),(1.+cos(tiden/8.))/2.);
+	//cPos = 2.0*vec3(cos(tiden/2.),sin(tiden/2.),(1.+cos(tiden/3.))/2.);
+	cPos = cameraPosition;
+	cDir = cameraForward;
+	cSide = cameraRight;
+	cUp  = normalize(cross(cameraRight,cameraForward));//cameraUp;
+	//cPos = vec3(2.0,0.,0.);
+	//cDir = vec3(-1.,0.,0.);
+	//cUp  = vec3(0.,0.,1.);
+	//cPos = vec3(2.0);
 	//cPos = 0.75*vec3(1.);
-	vec3 target = vec3(0.,0.,0.35);
-	cDir = normalize(target-cPos);
+	vec3 target = cPos+cDir;
+	//cDir = normalize(target-cPos);
 
 	//lightDirection = normalize(vec3(cos(tiden),sin(tiden),1.));
-	lightDirection = -cDir;
+	//lightDirection = normalize(vec3(3.*cos(tiden/4.),3.*sin(tiden/4.),2.));
+	//lightDirection = -cDir;
+	lightDirection = vec3(1.,1.,1.);
 
 	// ray init
-	vec3 cSide = cross(cDir, cUp);
+	//vec3 cSide = normalize(cross(cDir, cUp));
 	const float pi = 4.0 * atan(1.0);
 	const float fov = 60.0/180.*pi;
 	float f = 2./2./tan(fov/2.);

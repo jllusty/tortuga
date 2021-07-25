@@ -21,6 +21,7 @@ struct vec3 {
     inline float& x() { return data[0]; }
     inline float& y() { return data[1]; }
     inline float& z() { return data[2]; }
+    inline float* getData() { return data.data(); }
     // operator overloads
     //  arithmetic
     inline vec3 operator+(const vec3& u) const {
@@ -114,6 +115,10 @@ inline vec3 cross(const vec3& v, const vec3& u) {
     res.data[1] = v.data[2]*u.data[0] - v.data[0]*u.data[2],
     res.data[2] = v.data[0]*u.data[1] - v.data[1]*u.data[0];
     return res;
+}
+// normalization
+inline vec3 normalize(const vec3& v) {
+    return v/sqrtf(dot(v,v));
 }
 // rotate vector 'v' 'theta' radians about 'axis'
 inline void rotate(vec3& v, const vec3& axis, const float theta) {

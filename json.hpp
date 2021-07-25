@@ -35,6 +35,12 @@ namespace json {
         std::string iterString(iterCStr);
         return std::stoi(iterString);
     }
+    // get resolution
+    int getResolution() {
+        const char* resCStr = doc["resolution"].GetString();
+        std::string resString(resCStr);
+        return std::stoi(resString);
+    }
     // set grammar modules
     void setModules(std::vector<std::shared_ptr<grammar::module>>& modules) {
         const rapidjson::Value& ma = doc["modules"];

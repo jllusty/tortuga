@@ -6,3 +6,7 @@ include/
 lib/
 makefile
 glad.c
+output/
+make.bat
+frametests.cpp
+img_tests.cpp
